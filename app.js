@@ -2,11 +2,12 @@
 'use strict';
 
 /* ============ état ============ */
-var state = { objectives:[], projects:[], tasks:[] };
+var state = { objectives:[], projects:[], tasks:[], carte:[] };
 function normaliser(){
 if(!Array.isArray(state.objectives)) state.objectives = [];
 if(!Array.isArray(state.projects)) state.projects = [];
 if(!Array.isArray(state.tasks)) state.tasks = [];
+if(!Array.isArray(state.carte)) state.carte = [];
 state.tasks.forEach(function(t){
   if(typeof t.prio!=='boolean') t.prio = (t.priority==='urgent'||t.priority==='important');
   if('priority' in t) delete t.priority;
@@ -35,7 +36,7 @@ var ui = {
   editing:null, lotMenu:null,
   drawer:null, draft:null, confirmDel:false,
   collapsed:{}, save:'idle', readOnly:false, msg:'',
-  pret:false
+  pret:false, cz:null, noCarte:false
 };
 
 /* Lot présent d'office dans chaque projet, toujours affiché en dernier : c'est la zone
@@ -124,7 +125,7 @@ function loadPrefs(){
   try{
     var raw=localStorage.getItem('mape-prefs'); if(!raw) return;
     var o=JSON.parse(raw)||{};
-    if(o.tab==='gantt'||o.tab==='roadmap') ui.tab=o.tab;
+    if(o.tab==='gantt'||o.tab==='roadmap'||o.tab==='carte') ui.tab=o.tab;
     if(o.zoom&&PPD[o.zoom]) ui.zoom=o.zoom;
     if(Array.isArray(o.fOwners)) ui.fOwners=o.fOwners;
     if(Array.isArray(o.fBuckets)) ui.fBuckets=o.fBuckets;
@@ -862,7 +863,7 @@ function viewDrawer(){
   if(!ui.drawer) return '';
   var d=ui.draft, k=ui.drawer, isNew=!d.id;
   if(k==='data'){
-    var dump=JSON.stringify({objectives:state.objectives,projects:state.projects,tasks:state.tasks},null,2);
+    var dump=JSON.stringify({objectives:state.objectives,projects:state.projects,tasks:state.tasks,carte:state.carte},function(k,v){ return k.slice(0,2)==='__'?undefined:v; },2);
     return '<div class="scrim" data-act="close"></div><aside class="drawer" role="dialog" aria-label="Donnees">'+
       '<header><h2>Données</h2><button class="btn ghost" data-act="close">Fermer</button></header><div class="body">'+
       '<p class="hint">Copie ce texte pour garder une sauvegarde de l’état actuel.</p>'+
@@ -872,7 +873,8 @@ function viewDrawer(){
       '<span class="hint" style="margin:0 0 0 6px">Sauvegarde seulement — la source de vérité est SharePoint.</span>'+
       '<span class="spacer"></span></footer></aside>';
   }
-  var title = k==='obj'? (isNew?'Nouvelle orientation stratégique':'Orientation stratégique')
+  var title = k==='carte'? (d.genre==='zone'?'Zone':'Boîte')
+            : k==='obj'? (isNew?'Nouvelle orientation stratégique':'Orientation stratégique')
             : k==='proj'? (isNew?'Nouveau projet':'Projet')
             : (isNew?'Nouvelle tâche':'Tâche');
   var h='<div class="scrim" data-act="close"></div><aside class="drawer" role="dialog" aria-label="'+title+'">'+
@@ -881,6 +883,23 @@ function viewDrawer(){
   h+='<label class="lb"><span>Nom</span><input type="text" data-f="name" value="'+esc(d.name||'')+'" placeholder="'+
      (k==='task'?'Commencer par un verbe : Paramétrer les articles…':(k==='proj'?'Nom du projet':'Nom de l’orientation'))+'"></label>';
 
+  if(k==='carte'){
+    var pl=d.projectId? byId(state.projects,d.projectId) : null;
+    if(pl) h+='<p class="hint" style="margin-top:-6px">Le nom affiché est celui du projet « '+esc(pl.name)+' ». Ce champ ne sert que si le lien est retiré.</p>';
+    h+='<label class="lb"><span>Sous-titre</span><textarea data-f="note" rows="2" placeholder="Une ligne de précision">'+esc(d.note||'')+'</textarea></label>';
+    if(d.genre!=='zone'){
+      h+='<label class="lb"><span>Projet lié</span><select data-f="projectId"><option value="">— aucun —</option>'+
+         state.projects.map(function(p){ return '<option value="'+esc(p.id)+'"'+(d.projectId===p.id?' selected':'')+'>'+esc(p.name)+'</option>'; }).join('')+
+         '</select></label>';
+      if(!d.projectId && !ui.readOnly) h+='<button class="btn" data-act="carte-newproj" style="align-self:flex-start">Créer un projet avec ce nom</button>';
+      h+='<p class="hint">Liée à un projet, la boîte prend la couleur de son avancement : gris à faire, bleu en cours, vert quand toutes les tâches sont à 100 %. Le Backlog ne compte pas.</p>';
+    }
+    h+='<label class="lb"><span>Style</span><select data-f="style">'+
+       CSTYLES.map(function(s){ return '<option value="'+s[0]+'"'+((d.style||'normal')===s[0]?' selected':'')+'>'+s[1]+'</option>'; }).join('')+
+       '</select></label>';
+    var nf=state.carte.filter(function(f){ return f.genre==='fleche' && (f.de===d.id||f.vers===d.id); }).length;
+    if(nf) h+='<p class="hint">'+nf+' flèche'+(nf>1?'s':'')+' reliée'+(nf>1?'s':'')+' — un clic sur une flèche la supprime.</p>';
+  }
   if(k==='obj'){
     h+='<label class="lb"><span>Énoncé</span><textarea data-f="statement" rows="3" placeholder="Ce que l’on vise, en une phrase">'+esc(d.statement||'')+'</textarea></label>';
     h+='<label class="lb"><span>Responsable</span><input type="text" data-f="owner" list="owners" value="'+esc(d.owner||'')+'"></label>';
@@ -1025,12 +1044,26 @@ function viewBar(){
     '<div class="tabs" role="tablist">'+
       '<button class="tab" role="tab" aria-selected="'+(ui.tab==='roadmap')+'" data-act="tab" data-t="roadmap">Feuille de route <span class="n">'+nO+'</span></button>'+
       '<button class="tab" role="tab" aria-selected="'+(ui.tab==='gantt')+'" data-act="tab" data-t="gantt">Projets et tâches <span class="n">'+nP+'/'+nT+'</span></button>'+
+      '<button class="tab" role="tab" aria-selected="'+(ui.tab==='carte')+'" data-act="tab" data-t="carte">Infrastructure</button>'+
     '</div>'+
     '<div class="savebox"><span class="dot '+sv.c+'"></span>'+esc(sv.t)+'</div>'+
   '</div>';
 
   h+='<div class="toolbar">';
-  if(ui.tab==='gantt'){
+  if(ui.tab==='carte'){
+    h+='<div class="seg" role="group" aria-label="Zoom">'+
+       '<button data-act="carte-zoom" data-d="-1" title="Zoom arrière">−</button>'+
+       '<button data-act="carte-fit" title="Ajuster à la fenêtre">'+Math.round(zoomCarte()*100)+' %</button>'+
+       '<button data-act="carte-zoom" data-d="1" title="Zoom avant">+</button></div>';
+    h+='<span class="clegende"><span class="cpast et-afaire"></span>À faire<span class="cpast et-encours"></span>En cours'+
+       '<span class="cpast et-fini"></span>Terminé<span class="cpast st-externe"></span>Externe<span class="cpast st-priorite"></span>Priorité 1</span>';
+    h+='<span class="spacer"></span>';
+    if(!ui.readOnly){
+      h+='<button class="btn ghost" data-act="reload" title="Relire les listes SharePoint">Recharger</button>';
+      h+='<button class="btn" data-act="carte-new" data-g="zone">+ Zone</button>';
+      h+='<button class="btn primary" data-act="carte-new" data-g="bloc">+ Boîte</button>';
+    }
+  } else if(ui.tab==='gantt'){
     h+='<div class="seg" role="group" aria-label="Échelle">'+
        ['jour','semaine','mois'].map(function(z){
          return '<button data-act="zoom" data-z="'+z+'" aria-pressed="'+(ui.zoom===z)+'">'+z.charAt(0).toUpperCase()+z.slice(1)+'</button>';
@@ -1071,6 +1104,7 @@ function viewBar(){
 /* ============ rendu ============ */
 function contenuOnglet(){
   if(ui.tab==='roadmap') return viewRoadmap();
+  if(ui.tab==='carte') return viewCarte();
   return viewGantt();
 }
 /* Remplacer le DOM fait perdre le focus, ce qui declenche blur puis focusout sur le champ
@@ -1090,8 +1124,9 @@ function rendreVraiment(){
   var sx=anc?anc.scrollLeft:null, sy=anc?anc.scrollTop:null;
   var vol=root.querySelector('.pane');
   var vy=vol?vol.scrollTop:null, vx=vol?vol.scrollLeft:null;
+  var cs=root.querySelector('#cscroll'), cx=cs?cs.scrollLeft:null, cy=cs?cs.scrollTop:null;
   root.innerHTML = viewBar()+
-    '<div class="pane'+(ui.tab==='gantt'?'':' scroll')+'">'+contenuOnglet()+'</div>'+
+    '<div class="pane'+((ui.tab==='gantt'||ui.tab==='carte')?'':' scroll')+'">'+contenuOnglet()+'</div>'+
     viewDrawer()+
     '<datalist id="owners">'+owners().map(function(o){ return '<option value="'+esc(o)+'"></option>'; }).join('')+'</datalist>';
   var bar=root.querySelector('.appbar');
@@ -1104,6 +1139,8 @@ function rendreVraiment(){
     var nv=root.querySelector('.pane');
     if(nv){ nv.scrollTop=vy; nv.scrollLeft=vx; }
   }
+  if(cx!=null){ var nc=root.querySelector('#cscroll'); if(nc){ nc.scrollLeft=cx; nc.scrollTop=cy; } }
+  if(ui.tab==='carte' && ui.cz==null && state.carte.length) requestAnimationFrame(ajusterCarte);
   savePrefs();
   paintSave();
 }
@@ -1148,13 +1185,13 @@ function applyDraft(){
   var ld=document.getElementById('lotdrawer');
   if(ld && ld.value.trim()) ui.draft.lot=ld.value.trim();
   var d=ui.draft, k=ui.drawer;
-  if(!d.name || !d.name.trim()){ ui.msg='Donne un nom avant d’enregistrer.'; render(); return; }
+  if((k!=='carte' || !d.projectId) && (!d.name || !d.name.trim())){ ui.msg='Donne un nom avant d’enregistrer.'; render(); return; }
   if(k==='task'){
     if(!d.projectId){ ui.msg='Choisis un projet pour cette tâche.'; render(); return; }
     if(d.start && d.end && d.end < d.start){ var s=d.start; d.start=d.end; d.end=s; }
   }
   ui.msg='';
-  var list = k==='obj'? state.objectives : (k==='proj'? state.projects : state.tasks);
+  var list = k==='carte'? state.carte : k==='obj'? state.objectives : (k==='proj'? state.projects : state.tasks);
   if(d.id){
     var cur=byId(list,d.id);
     if(cur) for(var key in d){ if(key.slice(0,2)!=='__') cur[key]=d[key]; }
@@ -1171,8 +1208,16 @@ function deleteCurrent(){
   if(k==='obj'){
     state.objectives=state.objectives.filter(function(x){ return x.id!==d.id; });
     state.projects.forEach(function(p){ if(p.objectiveId===d.id){ p.objectiveId=''; detaches.push(['proj',p]); } });
+  } else if(k==='carte'){
+    var fl=state.carte.filter(function(f){ return f.genre==='fleche' && (f.de===d.id||f.vers===d.id); });
+    state.carte=state.carte.filter(function(x){ return x.id!==d.id && fl.indexOf(x)<0; });
+    closeDrawer(); supprimer('carte',d);
+    fl.forEach(function(f){ supprimer('carte',f); });
+    return;
   } else if(k==='proj'){
     state.projects=state.projects.filter(function(x){ return x.id!==d.id; });
+    // Les boîtes de la carte liées au projet restent, déliées.
+    state.carte.forEach(function(e){ if(e.projectId===d.id){ e.projectId=''; if(!e.name) e.name=d.name||''; detaches.push(['carte',e]); } });
     // Les tâches partent avec le projet, dans SharePoint aussi : sinon elles y restent orphelines.
     tachesProjet=state.tasks.filter(function(t){ return t.projectId===d.id; });
     state.tasks=state.tasks.filter(function(t){ return t.projectId!==d.id; });
@@ -1216,6 +1261,17 @@ async function chargerTout(){
       progress:+(r.Avancement||0), prio:(String(r.Prioritaire||'').toLowerCase()==='oui'),
       deps:SP.liste(r.Predecesseurs), note:r.Note||'',
       rang:(r.Rang===''||r.Rang==null)?null:+r.Rang }; });
+    // 04-Carte est facultative : sans elle, seul l'onglet Infrastructure le dit.
+    try{
+      var cr = await SP.getItems('carte');
+      state.carte = cr.map(function(r){ return {
+        spId:r.spId, id:r.CarteId||('crt-'+r.spId), genre:r.Genre||'bloc', name:r.Title||'',
+        note:r.Note||'', projectId:r.ProjetId||'', style:r.Style||'normal',
+        x:+(r.X||0), y:+(r.Y||0), w:+(r.L||0)||220, h:+(r.H||0)||88,
+        de:r.De||'', vers:r.Vers||'', deCote:r.DeCote||'', versCote:r.VersCote||'',
+        double:(String(r.Double||'').toLowerCase()==='oui') }; });
+      ui.noCarte=false;
+    }catch(e){ state.carte=[]; ui.noCarte=true; console.warn('Liste 04-Carte indisponible :', e.message); }
     normaliser();
     figerOrdreInitial();
     marquer('saved','À jour');
@@ -1234,7 +1290,12 @@ function champsTache(t){ return {
   Predecesseurs:(t.deps||[]).join('; '), Note:t.note||'',
   Rang:(t.rang==null?null:+t.rang) }; }
 
-var CLES={obj:['orientations',champsOrientation,'objectives'],
+function champsCarte(e){ return {
+  Title:e.name||'', CarteId:e.id, Genre:e.genre||'bloc', ProjetId:e.projectId||'', Style:e.style||'normal',
+  Note:e.note||'', X:Math.round(+e.x||0), Y:Math.round(+e.y||0), L:Math.round(+e.w||0), H:Math.round(+e.h||0),
+  De:e.de||'', Vers:e.vers||'', DeCote:e.deCote||'', VersCote:e.versCote||'', Double:e.double?'Oui':'Non' }; }
+var CLES={carte:['carte',champsCarte,'carte'],
+          obj:['orientations',champsOrientation,'objectives'],
           proj:['projets',champsProjet,'projects'],
           task:['taches',champsTache,'tasks']};
 
@@ -1319,6 +1380,253 @@ function paintSave(){
   box.innerHTML='<span class="dot '+cls+'"></span>'+esc(txt)+
     (SP.utilisateur()? ' · '+esc(SP.utilisateur()) : '');
 }
+
+/* ============ vue 3 : infrastructure (carte des projets) ============ */
+/* Le tableau blanc de l'architecture, mais branché sur les données : chaque boîte peut être
+   liée à un projet, et sa couleur suit l'avancement de ses tâches. Zones, boîtes et flèches
+   vivent dans la liste 04-Carte, une ligne par élément. On déplace à la souris, on étire par
+   le coin, on trace une flèche depuis le point au bord droit d'une boîte. */
+var CARTE_SEED = [{"id":"c-e4","genre":"zone","name":"Veille et intelligence","note":"","x":20,"y":20,"w":584,"h":472,"style":"normal"},{"id":"c-e5","genre":"zone","name":"Adjoint IA personnel","note":"","x":684,"y":20,"w":520,"h":144,"style":"normal"},{"id":"c-e6","genre":"zone","name":"Socle de données — Microsoft 365","note":"","x":684,"y":310,"w":520,"h":300,"style":"socle"},{"id":"c-e7","genre":"zone","name":"RH et gestion","note":"","x":1284,"y":20,"w":560,"h":472,"style":"normal"},{"id":"c-e8","genre":"zone","name":"Cycle client : de l'offre au paiement","note":"","x":20,"y":700,"w":1824,"h":288,"style":"normal"},{"id":"c-e9","genre":"zone","name":"Fondations TI et sécurité","note":"","x":20,"y":1068,"w":1824,"h":118,"style":"normal"},{"id":"c-e10","genre":"bloc","name":"Revue de presse quotidienne","note":"MapInfo 7 h — abonnements + mots-clés","x":44,"y":44,"w":236,"h":88,"style":"priorite"},{"id":"c-e11","genre":"bloc","name":"Revue personnalisée par client","note":"Trois-Rivières d'abord","x":344,"y":44,"w":236,"h":88,"style":"normal"},{"id":"c-e12","genre":"bloc","name":"Fiches de recherche","note":"élus, fonctionnaires, organisations","x":44,"y":156,"w":236,"h":88,"style":"normal"},{"id":"c-e13","genre":"bloc","name":"Cartographie des parties prenantes","note":"livrable client","x":344,"y":156,"w":236,"h":88,"style":"normal"},{"id":"c-e14","genre":"bloc","name":"Promesses électorales PQ","note":"classées par secteur","x":44,"y":268,"w":236,"h":88,"style":"normal"},{"id":"c-e15","genre":"bloc","name":"Rédaction assistée","note":"communiqués","x":344,"y":268,"w":236,"h":88,"style":"normal"},{"id":"c-e16","genre":"bloc","name":"Veille subventions par client","note":"alerte quand un programme correspond à un mandat","x":44,"y":380,"w":536,"h":88,"style":"normal"},{"id":"c-e17","genre":"bloc","name":"Courriels, calendrier, transcriptions de rencontres","note":"","x":708,"y":44,"w":200,"h":96,"style":"externe"},{"id":"c-e18","genre":"bloc","name":"Adjoint IA","note":"priorités du jour et de la semaine","x":972,"y":44,"w":208,"h":96,"style":"normal"},{"id":"c-e19","genre":"bloc","name":"Listes SharePoint","note":"Clients · Contacts et élus · Mandats · Heures · Employés","x":708,"y":334,"w":224,"h":140,"style":"donnees"},{"id":"c-e20","genre":"bloc","name":"Base de connaissances","note":"5 ans de production, plans, communiqués, OneNote","x":956,"y":334,"w":224,"h":140,"style":"donnees"},{"id":"c-e21","genre":"bloc","name":"Couche IA — agents Claude","note":"recherche · résumé · rédaction · alertes","x":708,"y":498,"w":472,"h":88,"style":"normal"},{"id":"c-e22","genre":"bloc","name":"SIRH","note":"(à évaluer)\ngratuit sous 15 employés","x":1308,"y":44,"w":244,"h":88,"style":"externe"},{"id":"c-e23","genre":"bloc","name":"Dossier employé","note":"paie, congés, vacances, banque d'heures","x":1576,"y":44,"w":244,"h":88,"style":"normal"},{"id":"c-e24","genre":"bloc","name":"Évaluations de rendement","note":"sondages envoyés et comparés","x":1308,"y":156,"w":244,"h":88,"style":"normal"},{"id":"c-e25","genre":"bloc","name":"Accueil et recrutement","note":"plus tard","x":1576,"y":156,"w":244,"h":88,"style":"normal"},{"id":"c-e26","genre":"bloc","name":"Tableau de bord du lundi","note":"heures facturables vs cible 19 h/sem · seuils 1 000 / 1 100 h/an","x":1308,"y":268,"w":512,"h":88,"style":"normal"},{"id":"c-e27","genre":"bloc","name":"Plans de travail","note":"modèle commun après la vente d'un mandat","x":1308,"y":380,"w":512,"h":88,"style":"normal"},{"id":"c-e40","genre":"bloc","name":"1. CRM","note":"dév. des affaires (remplace Planner)","x":44,"y":724,"w":190,"h":88,"style":"normal"},{"id":"c-e41","genre":"bloc","name":"2. Offre de services","note":"modèle unique","x":308,"y":724,"w":190,"h":88,"style":"normal"},{"id":"c-e42","genre":"bloc","name":"3. Contrat","note":"signature électronique","x":572,"y":724,"w":190,"h":88,"style":"normal"},{"id":"c-e43","genre":"bloc","name":"4. Mandat ouvert","note":"budget d'heures","x":836,"y":724,"w":190,"h":88,"style":"normal"},{"id":"c-e44","genre":"bloc","name":"5. Temps","note":"importé du calendrier Outlook","x":1100,"y":724,"w":190,"h":88,"style":"normal"},{"id":"c-e45","genre":"bloc","name":"6. Facturation","note":"QuickBooks","x":1364,"y":724,"w":190,"h":88,"style":"externe"},{"id":"c-e46","genre":"bloc","name":"7. Technicienne comptable","note":"conciliation","x":1628,"y":724,"w":190,"h":88,"style":"normal"},{"id":"c-e47","genre":"bloc","name":"Post-mortem","note":"formulaire de fin de mandat","x":836,"y":876,"w":190,"h":88,"style":"normal"},{"id":"c-e48","genre":"bloc","name":"Factures fournisseurs","note":"boîte facturation@ → approbation","x":1364,"y":876,"w":190,"h":88,"style":"normal"},{"id":"c-e60","genre":"bloc","name":"Services gérés","note":"quitter Info Plus, comparer Microarch / Hilotech","x":44,"y":1092,"w":276,"h":70,"style":"normal"},{"id":"c-e61","genre":"bloc","name":"Sauvegarde M365","note":"récupérable (à confirmer)","x":344,"y":1092,"w":276,"h":70,"style":"normal"},{"id":"c-e62","genre":"bloc","name":"Compte admin séparé","note":"du compte de tous les jours","x":644,"y":1092,"w":276,"h":70,"style":"normal"},{"id":"c-e63","genre":"bloc","name":"Teams et SharePoint","note":"restructurés","x":944,"y":1092,"w":276,"h":70,"style":"normal"},{"id":"c-e64","genre":"bloc","name":"Classement public / sensible","note":"(Loi 25)","x":1244,"y":1092,"w":276,"h":70,"style":"normal"},{"id":"c-e65","genre":"bloc","name":"Tout bâti chez Mapé","note":"autonomie complète","x":1544,"y":1092,"w":276,"h":70,"style":"normal"},{"id":"c-e30","genre":"fleche","name":"","de":"c-e10","vers":"c-e11","deCote":"right","versCote":"left","double":false,"style":"normal"},{"id":"c-e31","genre":"fleche","name":"","de":"c-e12","vers":"c-e13","deCote":"right","versCote":"left","double":false,"style":"normal"},{"id":"c-e32","genre":"fleche","name":"","de":"c-e17","vers":"c-e18","deCote":"right","versCote":"left","double":false,"style":"normal"},{"id":"c-e50","genre":"fleche","name":"","de":"c-e40","vers":"c-e41","deCote":"right","versCote":"left","double":false,"style":"normal"},{"id":"c-e51","genre":"fleche","name":"","de":"c-e41","vers":"c-e42","deCote":"right","versCote":"left","double":false,"style":"normal"},{"id":"c-e52","genre":"fleche","name":"","de":"c-e42","vers":"c-e43","deCote":"right","versCote":"left","double":false,"style":"normal"},{"id":"c-e53","genre":"fleche","name":"","de":"c-e43","vers":"c-e44","deCote":"right","versCote":"left","double":false,"style":"normal"},{"id":"c-e54","genre":"fleche","name":"","de":"c-e44","vers":"c-e45","deCote":"right","versCote":"left","double":false,"style":"normal"},{"id":"c-e55","genre":"fleche","name":"","de":"c-e45","vers":"c-e46","deCote":"right","versCote":"left","double":false,"style":"normal"},{"id":"c-e56","genre":"fleche","name":"","de":"c-e43","vers":"c-e47","deCote":"bottom","versCote":"top","double":false,"style":"normal"},{"id":"c-e57","genre":"fleche","name":"","de":"c-e48","vers":"c-e45","deCote":"top","versCote":"bottom","double":false,"style":"normal"},{"id":"c-e70","genre":"fleche","name":"","de":"c-e4","vers":"c-e6","deCote":"right","versCote":"left","double":true,"style":"socle"},{"id":"c-e71","genre":"fleche","name":"","de":"c-e6","vers":"c-e7","deCote":"right","versCote":"left","double":true,"style":"socle"},{"id":"c-e72","genre":"fleche","name":"","de":"c-e5","vers":"c-e6","deCote":"bottom","versCote":"top","double":true,"style":"socle"},{"id":"c-e73","genre":"fleche","name":"","de":"c-e6","vers":"c-e8","deCote":"bottom","versCote":"top","double":true,"style":"socle"}];
+var CSTYLES=[['normal','Normal'],['priorite','Priorité 1'],['externe','Outil ou source externe'],
+             ['donnees','Données'],['socle','Socle (bleu)']];
+var CETATS={afaire:'À faire', encours:'En cours', fini:'Terminé'};
+function etatProjet(p){
+  var v=projProgress(p);
+  if(v===null || v===0) return 'afaire';
+  return v>=100 ? 'fini' : 'encours';
+}
+function carteParId(id){ return byId(state.carte,id); }
+function carteBornes(){
+  var W=1200, H=700;
+  state.carte.forEach(function(e){
+    if(e.genre==='fleche') return;
+    W=Math.max(W, e.x+e.w+40); H=Math.max(H, e.y+e.h+40);
+  });
+  return {W:W, H:H};
+}
+function zoomCarte(){ return ui.cz || 1; }
+function ajusterCarte(){
+  var sc=document.getElementById('cscroll'); if(!sc) return;
+  var b=carteBornes();
+  ui.cz=clamp(Math.floor((sc.clientWidth-24)/b.W*100)/100, 0.3, 1.5);
+  render();
+}
+function pointCote(e,cote){
+  if(cote==='left')   return {x:e.x,       y:e.y+e.h/2, h:true};
+  if(cote==='right')  return {x:e.x+e.w,   y:e.y+e.h/2, h:true};
+  if(cote==='top')    return {x:e.x+e.w/2, y:e.y,       h:false};
+  return                     {x:e.x+e.w/2, y:e.y+e.h,   h:false};
+}
+function cotesAuto(a,b){
+  var dx=(b.x+b.w/2)-(a.x+a.w/2), dy=(b.y+b.h/2)-(a.y+a.h/2);
+  if(Math.abs(dx)>=Math.abs(dy)) return dx>=0? ['right','left'] : ['left','right'];
+  return dy>=0? ['bottom','top'] : ['top','bottom'];
+}
+function cheminFleche(f){
+  var a=carteParId(f.de), b=carteParId(f.vers); if(!a||!b) return '';
+  var auto=cotesAuto(a,b);
+  var p=pointCote(a,f.deCote||auto[0]), q=pointCote(b,f.versCote||auto[1]);
+  if(p.h && q.h){ var mx=Math.round((p.x+q.x)/2); return 'M'+p.x+' '+p.y+' H'+mx+' V'+q.y+' H'+q.x; }
+  if(!p.h && !q.h){ var my=Math.round((p.y+q.y)/2); return 'M'+p.x+' '+p.y+' V'+my+' H'+q.x+' V'+q.y; }
+  if(p.h) return 'M'+p.x+' '+p.y+' H'+q.x+' V'+q.y;
+  return 'M'+p.x+' '+p.y+' V'+q.y+' H'+q.x;
+}
+function svgFleches(){
+  var h='';
+  state.carte.forEach(function(f){
+    if(f.genre!=='fleche') return;
+    var d=cheminFleche(f); if(!d) return;
+    var cls='cfl'+(f.style==='socle'?' bleu':'');
+    h+='<path class="'+cls+'" d="'+d+'" marker-end="url(#cfh'+(f.style==='socle'?'b':'')+')"'+
+       (f.double?' marker-start="url(#cfh'+(f.style==='socle'?'b':'')+')"':'')+'/>'+
+       (ui.readOnly?'':'<path class="cfl-hit" d="'+d+'" data-act="carte-fdel" data-id="'+esc(f.id)+'"><title>Flèche — cliquer pour la supprimer</title></path>');
+  });
+  return h;
+}
+function majFleches(){
+  var g=document.getElementById('cfleches'); if(g) g.innerHTML=svgFleches();
+}
+function htmlElement(e){
+  var p=e.projectId? byId(state.projects,e.projectId) : null;
+  var titre=p? (p.name||'Projet') : (e.name||'');
+  var et=p? etatProjet(p) : '';
+  var pr=p? projProgress(p) : null;
+  var st='left:'+e.x+'px;top:'+e.y+'px;width:'+e.w+'px;height:'+e.h+'px';
+  var outils=ui.readOnly?'':
+    '<span class="cres" data-cres="'+esc(e.id)+'" title="Glisser pour redimensionner"></span>'+
+    (e.genre==='bloc'?'<span class="chand" data-chand="'+esc(e.id)+'" title="Glisser vers une autre boîte pour tracer une flèche"></span>':'');
+  if(e.genre==='zone'){
+    return '<div class="czone st-'+esc(e.style)+'" data-cid="'+esc(e.id)+'" data-act="edit-carte" data-id="'+esc(e.id)+'" style="'+st+'">'+
+      '<span class="czlab">'+esc(titre)+'</span>'+outils+'</div>';
+  }
+  return '<div class="cbox st-'+esc(e.style)+(p?' lie et-'+et:'')+'" data-cid="'+esc(e.id)+'" data-act="edit-carte" data-id="'+esc(e.id)+'" style="'+st+'">'+
+    '<b>'+esc(titre)+'</b>'+
+    (e.note?'<span class="cnote">'+esc(e.note)+'</span>':'')+
+    (p?'<span class="cetat">'+CETATS[et]+(pr!==null&&et==='encours'?' · '+pr+'%':'')+'</span>':'')+
+    outils+'</div>';
+}
+function viewCarte(){
+  if(ui.noCarte){
+    return '<div class="empty"><h2>Liste 04-Carte manquante</h2>'+
+      '<p>L’onglet Infrastructure enregistre ses zones, boîtes et flèches dans une liste <b>04-Carte</b> du site. '+
+      'Relance <code>creer-listes-mape.ps1</code> pour la créer, puis « Recharger ».</p></div>';
+  }
+  if(!state.carte.length){
+    return '<div class="empty"><h2>La carte est vide</h2>'+
+      '<p>Reprends le tableau blanc « Architecture des applications » : ses 6 zones, 33 boîtes et 15 flèches. '+
+      'Les boîtes dont le nom correspond à un projet existant y sont liées tout de suite.</p>'+
+      (ui.readOnly?'':'<div class="acts"><button class="btn primary" data-act="carte-seed">Importer le tableau blanc</button>'+
+        '<button class="btn" data-act="carte-new" data-g="zone">Partir d’une zone vide</button></div>')+'</div>';
+  }
+  var b=carteBornes(), z=zoomCarte();
+  var zones=state.carte.filter(function(e){ return e.genre==='zone'; })
+    .sort(function(a,c){ return c.w*c.h - a.w*a.h; });
+  var blocs=state.carte.filter(function(e){ return e.genre==='bloc'; });
+  var h='<div class="carte-wrap"><div class="carte-scroll" id="cscroll">'+
+    '<div class="carte" style="width:'+Math.ceil(b.W*z)+'px;height:'+Math.ceil(b.H*z)+'px">'+
+    '<div class="carte-in" id="cin" style="width:'+b.W+'px;height:'+b.H+'px;transform:scale('+z+')">';
+  zones.forEach(function(e){ h+=htmlElement(e); });
+  h+='<svg class="cfleches'+(ui.readOnly?'':' cliquable')+'" width="'+b.W+'" height="'+b.H+'">'+
+     '<defs><marker id="cfh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="cfh"/></marker>'+
+     '<marker id="cfhb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="cfh bleu"/></marker></defs>'+
+     '<g id="cfleches">'+svgFleches()+'</g></svg>';
+  blocs.forEach(function(e){ h+=htmlElement(e); });
+  h+='</div></div></div>';
+  // Projets qui n'ont pas encore de boîte : on peut les placer d'un clic.
+  var lies={}; blocs.forEach(function(e){ if(e.projectId) lies[e.projectId]=1; });
+  var libres=state.projects.filter(function(p){ return !lies[p.id]; });
+  h+='<aside class="ctray"><p class="souslab">Projets hors carte</p>'+
+     (libres.length? libres.map(function(p){
+        return '<div class="ctrow"><span class="ctname">'+esc(p.name||'Projet')+'</span>'+
+          (ui.readOnly?'':'<button class="btn mini" data-act="carte-place" data-id="'+esc(p.id)+'">Placer</button>')+'</div>';
+      }).join('') : '<p class="hint">Tous les projets sont sur la carte.</p>')+
+     '<p class="souslab" style="margin-top:16px">Comment ça marche</p>'+
+     '<p class="hint">Glisser une boîte pour la déplacer, son coin pour l’étirer, le point à droite vers une autre boîte pour tracer une flèche. '+
+     'Une boîte liée à un projet prend la couleur de son avancement : elle passe au vert quand toutes ses tâches sont à 100 %.</p>'+
+     '</aside></div>';
+  return h;
+}
+function nouvelElementCarte(genre, proj){
+  var z=zoomCarte(), sc=document.getElementById('cscroll');
+  var w=genre==='zone'?480:220, hh=genre==='zone'?260:88;
+  var x=60, y=60;
+  if(sc){ x=Math.round((sc.scrollLeft+sc.clientWidth/2)/z - w/2); y=Math.round((sc.scrollTop+sc.clientHeight/2)/z - hh/2); }
+  var e={id:uid('crt'), genre:genre, name:proj?'':(genre==='zone'?'Nouvelle zone':'Nouvelle boîte'),
+         note:'', x:Math.max(0,x), y:Math.max(0,y), w:w, h:hh, style:'normal', projectId:proj?proj.id:'',
+         de:'', vers:'', deCote:'', versCote:'', double:false};
+  state.carte.push(e);
+  render();
+  enregistrer('carte',e);
+  if(!proj) openDrawer('carte',e);
+}
+function carteSeed(){
+  if(ui.readOnly || state.carte.length) return;
+  var parNom=state.projects.map(function(p){ return {p:p, n:String(p.name||'').trim().toLowerCase()}; })
+    .filter(function(x){ return x.n; });
+  state.carte=CARTE_SEED.map(function(s){
+    var e={id:s.id, genre:s.genre, name:s.name||'', note:s.note||'', x:s.x||0, y:s.y||0,
+           w:s.w||0, h:s.h||0, style:s.style||'normal', projectId:'',
+           de:s.de||'', vers:s.vers||'', deCote:s.deCote||'', versCote:s.versCote||'', double:!!s.double};
+    if(e.genre==='bloc'){
+      var n=e.name.toLowerCase();
+      var m=parNom.filter(function(x){ return n.indexOf(x.n)===0 || x.n.indexOf(n)===0; })[0];
+      if(m){ e.projectId=m.p.id; e.name=''; }
+    }
+    return e;
+  });
+  ui.cz=null;
+  render();
+  requestAnimationFrame(ajusterCarte);
+  enregistrerLot(state.carte.map(function(e){ return ['carte',e]; }));
+}
+function supprimerFleche(id){
+  var f=carteParId(id); if(!f || ui.readOnly) return;
+  state.carte=state.carte.filter(function(x){ return x.id!==id; });
+  render(); supprimer('carte',f);
+}
+/* ---- souris : déplacer, étirer, tracer ---- */
+var cdrag=null, cfl=null;
+function zoneContient(z,e){
+  return e.x>=z.x && e.y>=z.y && e.x+e.w<=z.x+z.w && e.y+e.h<=z.y+z.h;
+}
+document.addEventListener('mousedown',function(ev){
+  if(ui.tab!=='carte' || ui.readOnly || ev.button!==0) return;
+  var t=ev.target;
+  var res=t.closest && t.closest('[data-cres]');
+  var han=t.closest && t.closest('[data-chand]');
+  var el=t.closest && t.closest('[data-cid]');
+  if(!res && !han && !el) return;
+  ev.preventDefault();
+  var z=zoomCarte();
+  if(han){
+    var src=carteParId(han.getAttribute('data-chand')); if(!src) return;
+    cfl={de:src.id, x0:ev.clientX, y0:ev.clientY};
+    document.body.classList.add('linking');
+    return;
+  }
+  var e=carteParId((res||el).getAttribute(res?'data-cres':'data-cid')); if(!e) return;
+  var suiveurs=[];
+  if(!res && e.genre==='zone'){
+    // Une zone emmène ce qu'elle contient, comme sur le tableau blanc.
+    state.carte.forEach(function(x){
+      if(x!==e && x.genre!=='fleche' && zoneContient(e,x)) suiveurs.push({e:x, x0:x.x, y0:x.y});
+    });
+  }
+  cdrag={e:e, mode:res?'taille':'bouger', mx:ev.clientX, my:ev.clientY, x0:e.x, y0:e.y, w0:e.w, h0:e.h,
+         z:z, suiveurs:suiveurs, bouge:false};
+  document.body.classList.add(res?'dragging-x':'dragging');
+});
+document.addEventListener('mousemove',function(ev){
+  if(cfl){
+    var sv=document.getElementById('lienprov');
+    if(!sv){ sv=document.createElementNS('http://www.w3.org/2000/svg','svg'); sv.id='lienprov';
+      sv.setAttribute('class','lienprov'); sv.innerHTML='<path></path>'; document.body.appendChild(sv); }
+    sv.firstChild.setAttribute('d','M'+cfl.x0+' '+cfl.y0+' L'+ev.clientX+' '+ev.clientY);
+    return;
+  }
+  if(!cdrag) return;
+  var dx=(ev.clientX-cdrag.mx)/cdrag.z, dy=(ev.clientY-cdrag.my)/cdrag.z;
+  if(Math.abs(dx)+Math.abs(dy)>3) cdrag.bouge=true;
+  if(!cdrag.bouge) return;
+  var e=cdrag.e, n=function(v){ return Math.round(v/4)*4; };
+  if(cdrag.mode==='taille'){
+    e.w=Math.max(e.genre==='zone'?160:120, n(cdrag.w0+dx));
+    e.h=Math.max(e.genre==='zone'?80:48, n(cdrag.h0+dy));
+  } else {
+    e.x=Math.max(0,n(cdrag.x0+dx)); e.y=Math.max(0,n(cdrag.y0+dy));
+    cdrag.suiveurs.forEach(function(s){ s.e.x=Math.max(0,s.x0+(e.x-cdrag.x0)); s.e.y=Math.max(0,s.y0+(e.y-cdrag.y0)); });
+  }
+  [e].concat(cdrag.suiveurs.map(function(s){ return s.e; })).forEach(function(x){
+    var d=document.querySelector('[data-cid="'+x.id+'"]');
+    if(d){ d.style.left=x.x+'px'; d.style.top=x.y+'px'; d.style.width=x.w+'px'; d.style.height=x.h+'px'; }
+  });
+  majFleches();
+});
+document.addEventListener('mouseup',function(ev){
+  if(cfl){
+    var c=cfl; cfl=null;
+    document.body.classList.remove('linking');
+    var sv=document.getElementById('lienprov'); if(sv&&sv.parentNode) sv.parentNode.removeChild(sv);
+    var cible=document.elementFromPoint(ev.clientX,ev.clientY);
+    cible=cible && cible.closest && cible.closest('[data-cid]');
+    var vers=cible && cible.getAttribute('data-cid');
+    if(!vers || vers===c.de) return;
+    if(state.carte.some(function(f){ return f.genre==='fleche' && f.de===c.de && f.vers===vers; })) return;
+    var f={id:uid('crt'), genre:'fleche', name:'', note:'', x:0, y:0, w:0, h:0, style:'normal', projectId:'',
+           de:c.de, vers:vers, deCote:'', versCote:'', double:false};
+    state.carte.push(f);
+    suppressClick=true; setTimeout(function(){ suppressClick=false; },300);
+    render(); enregistrer('carte',f);
+    return;
+  }
+  if(!cdrag) return;
+  var d=cdrag; cdrag=null;
+  document.body.classList.remove('dragging','dragging-x');
+  if(!d.bouge) return;                         // simple clic : le clic ouvre la fiche
+  suppressClick=true; setTimeout(function(){ suppressClick=false; },300);
+  render();
+  enregistrerLot([['carte',d.e]].concat(d.suiveurs.map(function(s){ return ['carte',s.e]; })));
+});
 
 /* ============ événements ============ */
 document.addEventListener('click',function(ev){
@@ -1408,6 +1716,20 @@ document.addEventListener('click',function(ev){
   }
   if(a==='new-lot'){ nouveauLotDepuis(el.getAttribute('data-t')); return; }
   if(a==='dep-del'){ retirerLien(el.getAttribute('data-from'), el.getAttribute('data-to')); return; }
+  if(a==='edit-carte'){ var ce=carteParId(el.getAttribute('data-id')); if(ce) openDrawer('carte',ce); return; }
+  if(a==='carte-seed'){ carteSeed(); return; }
+  if(a==='carte-new'){ nouvelElementCarte(el.getAttribute('data-g')||'bloc'); return; }
+  if(a==='carte-place'){ var pp2=byId(state.projects,el.getAttribute('data-id')); if(pp2) nouvelElementCarte('bloc',pp2); return; }
+  if(a==='carte-fdel'){ supprimerFleche(el.getAttribute('data-id')); return; }
+  if(a==='carte-fit'){ ajusterCarte(); return; }
+  if(a==='carte-zoom'){ ui.cz=clamp(Math.round((zoomCarte()+(+el.getAttribute('data-d'))*0.1)*10)/10,0.3,1.5); render(); return; }
+  if(a==='carte-newproj'){
+    collectDraft();
+    var nom=(ui.draft.name||'').trim(); if(!nom){ ui.msg='Donne un nom à la boîte d’abord.'; render(); return; }
+    var np={id:uid('proj'), name:nom, objectiveId:'', owner:''};
+    state.projects.push(np); enregistrer('proj',np);
+    ui.draft.projectId=np.id; ui.msg=''; render(); return;
+  }
   if(a==='edit-obj'){ openDrawer('obj',byId(state.objectives,el.getAttribute('data-id'))); return; }
   if(a==='edit-proj'){ openDrawer('proj',byId(state.projects,el.getAttribute('data-id'))); return; }
   if(a==='edit-task'){ openDrawer('task',byId(state.tasks,el.getAttribute('data-id'))); return; }

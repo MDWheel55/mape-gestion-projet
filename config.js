@@ -11,6 +11,7 @@ const CONFIG = {
   lists: {
     orientations: "01-Orientations",
     projets:      "02-Projets",
-    taches:       "03-Taches"
+    taches:       "03-Taches",
+    carte:        "04-Carte"
   }
 };
