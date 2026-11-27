@@ -154,6 +154,14 @@ const SP = (function () {
       });
       // Une colonne modifiable prime toujours pour la lecture aussi : c'est celle qui porte la valeur.
       Object.keys(ecriture).forEach(aff => { lecture[aff] = ecriture[aff]; });
+      /* Le nom interne sert aussi de clé. Sur un site en français, la colonne Title s'affiche
+         « Titre » : sans cette ligne, l'app cherchait « Title », ne la trouvait pas et le nom
+         des projets et des tâches n'était ni écrit ni relu. Ajouté après les noms affichés
+         pour qu'à la relecture, « Title » l'emporte sur « Titre ». */
+      cols.forEach(c => {
+        if (!c.readOnly && !c.hidden && !(c.name in ecriture)) ecriture[c.name] = c.name;
+        if (!c.readOnly && !c.hidden) lecture[c.name] = c.name;
+      });
       champs[cle] = { lecture, ecriture };
     }
     return champs[cle];
