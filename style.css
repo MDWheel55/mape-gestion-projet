@@ -1,0 +1,701 @@
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+:root{
+  color-scheme:light;
+  --ground:#F3F5EF; --surface:#FFFFFF; --surface-2:#F8FAF4; --surface-3:#EDF1E7;
+  --line:#E0E5D9; --line-2:#C7D0BC;
+  --ink:#161A13; --ink-2:#4C5445; --ink-3:#79826E;
+  --accent:#245038; --accent-ink:#FFFFFF; --accent-soft:#E3EDE5; --accent-line:#B9CDBF;
+  --danger:#A62B21; --danger-soft:#FBE9E7; --danger-line:#E5B4AE;
+  --s1:#1F7A3D; --s2:#2E6FC7; --s3:#BF7714; --s4:#7A4FA3; --s5:#C0392B; --s6:#0E8F86;
+  --grid:#E8ECE1; --grid-2:#D6DDCB; --weekend:#F1F3EA; --today:#B3261E;
+  --prio-urgent:#A62B21; --prio-important:#8A5200; --prio-imp-soft:#F8EEDA;
+  --shadow-1:0 1px 2px rgba(22,32,16,.06);
+  --shadow-2:0 2px 4px rgba(22,32,16,.05),0 12px 32px rgba(22,32,16,.10);
+  --r:7px;
+  --w-name:300px; --w-own:104px; --w-due:96px; --w-pct:48px; --w-note:150px;
+  --lw:calc(var(--w-name) + var(--w-own) + var(--w-due) + var(--w-pct) + var(--w-note));
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --ground:#12150F; --surface:#191D16; --surface-2:#20251C; --surface-3:#262C21;
+    --line:#2C3227; --line-2:#3E4637;
+    --ink:#E9EDE2; --ink-2:#AEB7A3; --ink-3:#828C77;
+    --accent:#63B37F; --accent-ink:#0E140F; --accent-soft:#213026; --accent-line:#334A3A;
+    --danger:#F08A80; --danger-soft:#2E1C1A; --danger-line:#4C2E2A;
+    --s1:#2E8F50; --s2:#5A93E0; --s3:#C08213; --s4:#9B72C4; --s5:#D75A50; --s6:#1E9A90;
+    --grid:#21261D; --grid-2:#2E3529; --weekend:#1D2219; --today:#F08A80;
+  --prio-urgent:#F08A80; --prio-important:#E0A64A; --prio-imp-soft:#2C2517;
+    --prio-urgent:#F08A80; --prio-important:#E0A64A; --prio-imp-soft:#2C2517;
+    --shadow-1:0 1px 2px rgba(0,0,0,.4);
+    --shadow-2:0 2px 4px rgba(0,0,0,.35),0 12px 32px rgba(0,0,0,.45);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --ground:#12150F; --surface:#191D16; --surface-2:#20251C; --surface-3:#262C21;
+  --line:#2C3227; --line-2:#3E4637;
+  --ink:#E9EDE2; --ink-2:#AEB7A3; --ink-3:#828C77;
+  --accent:#63B37F; --accent-ink:#0E140F; --accent-soft:#213026; --accent-line:#334A3A;
+  --danger:#F08A80; --danger-soft:#2E1C1A; --danger-line:#4C2E2A;
+  --s1:#2E8F50; --s2:#5A93E0; --s3:#C08213; --s4:#9B72C4; --s5:#D75A50; --s6:#1E9A90;
+  --grid:#21261D; --grid-2:#2E3529; --weekend:#1D2219; --today:#F08A80;
+  --shadow-1:0 1px 2px rgba(0,0,0,.4);
+  --shadow-2:0 2px 4px rgba(0,0,0,.35),0 12px 32px rgba(0,0,0,.45);
+}
+body{
+  background:var(--ground); color:var(--ink);
+  font-family:Archivo,"Segoe UI",system-ui,-apple-system,sans-serif;
+  font-size:14px; line-height:1.45; -webkit-font-smoothing:antialiased;
+}
+#root{height:100vh; height:100dvh; display:flex; flex-direction:column; overflow:hidden; overflow-anchor:none}
+.pane.scroll{display:block; overflow:auto; overflow-anchor:none}
+button,input,select,textarea{font:inherit; color:inherit}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:3px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
+
+/* ---------- app bar ---------- */
+.appbar{
+  display:flex; align-items:flex-end; gap:24px; flex-wrap:wrap;
+  padding:16px 22px 0; background:var(--surface); border-bottom:1px solid var(--line);
+  position:sticky; top:0; z-index:40;
+}
+.brand{display:flex; flex-direction:column; gap:1px; margin-bottom:10px; margin-right:auto}
+.brand h1{
+  font-family:Fraunces,Georgia,serif; font-weight:600; font-size:19px; letter-spacing:-.01em;
+  margin:0; line-height:1.1;
+}
+.brand .sub{font-size:11.5px; color:var(--ink-3); letter-spacing:.04em; text-transform:uppercase}
+.tabs{display:flex; gap:2px; align-self:flex-end; flex-wrap:wrap}
+.tab{
+  appearance:none; background:none; border:0; border-bottom:2px solid transparent;
+  padding:9px 14px 11px; font-size:13.5px; font-weight:500; color:var(--ink-3); cursor:pointer;
+  display:flex; align-items:center; gap:7px;
+}
+.tab:hover{color:var(--ink-2)}
+.tab[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--accent); font-weight:600}
+.tab .n{
+  font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3);
+  background:var(--surface-3); border-radius:20px; padding:1px 6px;
+}
+.savebox{display:flex; align-items:center; gap:8px; margin-bottom:10px; font-size:12px; color:var(--ink-3)}
+.dot{width:7px; height:7px; border-radius:50%; background:var(--ink-3); flex:none}
+.dot.ok{background:var(--s1)} .dot.busy{background:var(--s3)} .dot.err{background:var(--danger)}
+
+/* ---------- toolbar ---------- */
+.toolbar{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:10px 22px; background:var(--surface); border-bottom:1px solid var(--line);
+  position:sticky; top:var(--bartop,60px); z-index:35;
+}
+.seg{display:flex; background:var(--surface-3); border-radius:var(--r); padding:2px}
+.seg button{
+  appearance:none; background:none; border:0; padding:4px 11px; border-radius:5px;
+  font-size:12.5px; color:var(--ink-2); cursor:pointer;
+}
+.seg button[aria-pressed="true"]{background:var(--surface); color:var(--ink); font-weight:600; box-shadow:var(--shadow-1)}
+.btn{
+  appearance:none; cursor:pointer; border:1px solid var(--line-2); background:var(--surface);
+  color:var(--ink); border-radius:var(--r); padding:5px 11px; font-size:12.5px; font-weight:500;
+  display:inline-flex; align-items:center; gap:6px;
+}
+.btn:hover{background:var(--surface-2); border-color:var(--ink-3)}
+.btn.primary{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{border-color:transparent; background:none; color:var(--ink-2)}
+.btn.ghost:hover{background:var(--surface-3)}
+.btn.danger{border-color:var(--danger-line); color:var(--danger); background:var(--danger-soft)}
+.field{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-3)}
+select,input[type=text],input[type=date],input[type=number],textarea{
+  background:var(--surface); border:1px solid var(--line-2); border-radius:var(--r);
+  padding:5px 8px; font-size:12.5px; color:var(--ink); min-width:0;
+}
+textarea{resize:vertical; line-height:1.5}
+.spacer{flex:1}
+.legend{display:flex; align-items:center; gap:12px; flex-wrap:wrap; font-size:11.5px; color:var(--ink-2)}
+.legend .it{display:flex; align-items:center; gap:5px}
+.swatch{width:9px; height:9px; border-radius:2px; flex:none}
+
+/* ---------- filtres ---------- */
+.filterbar{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:9px 22px; background:var(--surface-2); border-bottom:1px solid var(--line);
+}
+.flabel{font-size:10.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-3); font-weight:600}
+.togs{display:flex; gap:4px; flex-wrap:wrap}
+.tog{
+  appearance:none; cursor:pointer; border:1px solid var(--line-2); background:var(--surface);
+  color:var(--ink-2); border-radius:20px; padding:3px 11px; font-size:12px;
+}
+.tog:hover{border-color:var(--ink-3); color:var(--ink)}
+.tog[aria-pressed="true"]{background:var(--accent-soft); border-color:var(--accent-line); color:var(--accent); font-weight:600}
+.menu-wrap{position:relative}
+.menu-own{z-index:70}
+.menu-add{display:flex; gap:5px; padding:5px 4px 2px; border-top:1px solid var(--line); margin-top:4px}
+.menu-add input{flex:1; min-width:0}
+.menu{
+  position:absolute; top:calc(100% + 6px); left:0; z-index:50; background:var(--surface);
+  border:1px solid var(--line-2); border-radius:9px; box-shadow:var(--shadow-2);
+  padding:5px; min-width:200px; max-height:270px; overflow:auto;
+}
+.menu label{display:flex; align-items:center; gap:8px; padding:5px 8px; border-radius:6px; font-size:12.5px; cursor:pointer}
+.menu label:hover{background:var(--surface-3)}
+.menu .none{padding:8px; font-size:12px; color:var(--ink-3)}
+.cnt{
+  font-family:"IBM Plex Mono",monospace; font-size:10.5px; background:var(--accent-soft);
+  color:var(--accent); border-radius:20px; padding:0 5px;
+}
+.prio{
+  font-size:9.5px; font-weight:700; letter-spacing:.05em; padding:1px 5px 2px;
+  border-radius:4px; text-transform:uppercase; flex:none;
+}
+.prio.urgent{background:var(--danger-soft); color:var(--prio-urgent)}
+.prio.important{background:var(--prio-imp-soft); color:var(--prio-important)}
+.gantt .lft{width:var(--lw)}
+.rz{position:absolute; top:0; right:0; width:8px; height:100%; cursor:col-resize; z-index:30}
+.rz::after{content:""; position:absolute; right:3px; top:5px; bottom:5px; width:1px; background:var(--line-2)}
+.rz:hover::after,.rz.on::after{background:var(--accent); width:2px; top:0; bottom:0}
+.tname.on{color:var(--danger); font-weight:600}
+/* Cellules modifiables au clic : l'affordance reste discrète, elle n'apparaît qu'au survol. */
+.cellv{cursor:text; border-bottom:1px dashed transparent; padding-bottom:1px}
+.row:hover .cellv{border-bottom-color:var(--line-2)}
+.cellv:hover{border-bottom-color:var(--ink-3); color:var(--ink)}
+.cellv.vide{color:var(--ink-3)}
+.c input.inline{
+  position:absolute; left:4px; top:50%; transform:translateY(-50%); z-index:75;
+  width:auto; min-width:162px; padding:3px 6px; font-size:12.5px;
+  border:1px solid var(--accent); border-radius:5px;
+  background:var(--surface); color:var(--ink); outline:none;
+  box-shadow:var(--shadow-2);
+}
+.c input.inline[type=number]{min-width:104px}
+.nvide{color:var(--line-2)}
+.ownchips{display:flex; gap:5px; flex-wrap:wrap}
+.ownchip{
+  display:inline-flex; align-items:center; gap:3px; font-size:12px; padding:2px 4px 2px 9px;
+  border-radius:20px; background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent-line);
+}
+.ownchip .x{
+  appearance:none; border:0; background:none; color:inherit; cursor:pointer; font-size:14px;
+  line-height:1; padding:0 3px; border-radius:50%; opacity:.7;
+}
+.ownchip .x:hover{opacity:1; background:rgba(0,0,0,.08)}
+.ownquick{display:flex; gap:4px; flex-wrap:wrap; margin-top:7px}
+.ownquick .tog{font-size:11.5px; padding:2px 8px}
+.bang{color:var(--danger); font-weight:700; margin-right:1px}
+
+/* ---------- generic ---------- */
+.pane{flex:1; min-height:0; display:flex; flex-direction:column}
+.empty{
+  margin:48px auto; max-width:520px; text-align:center; padding:34px 30px;
+  background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow-1);
+}
+.empty h2{font-family:Fraunces,Georgia,serif; font-weight:600; font-size:18px; margin:0 0 8px}
+.empty p{color:var(--ink-2); margin:0 0 18px; font-size:13.5px}
+.empty .acts{display:flex; gap:8px; justify-content:center; flex-wrap:wrap}
+.chip{
+  display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:1px 7px 2px;
+  border-radius:20px; background:var(--surface-3); color:var(--ink-2); white-space:nowrap;
+}
+.chip .swatch{width:7px; height:7px; border-radius:50%}
+.mono{font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums}
+.late{color:var(--danger); font-weight:600}
+
+/* ---------- timeline shared ---------- */
+.scroller{overflow-anchor:none; flex:1; min-height:0; overflow:auto; background:var(--surface)}
+.scroller.compact{flex:none; max-height:none; overflow-x:auto; overflow-y:visible; border-top:1px solid var(--line); border-bottom:1px solid var(--line)}
+.tl-head{position:sticky; top:0; z-index:20; background:var(--surface); box-shadow:0 1px 0 var(--line-2)}
+.band{display:flex; height:24px; align-items:stretch}
+.band.days{height:20px}
+.mcell{
+  border-left:1px solid var(--grid-2); font-size:11.5px; color:var(--ink-2); font-weight:600;
+  padding:3px 0 0 7px; overflow:hidden; white-space:nowrap; text-transform:capitalize;
+}
+.dcell{
+  border-left:1px solid var(--grid); font-size:10px; color:var(--ink-3); text-align:center;
+  padding-top:3px; overflow:hidden; font-family:"IBM Plex Mono",monospace;
+}
+.dcell.we{background:var(--weekend)}
+.dcell.mstart{border-left-color:var(--grid-2)}
+.gridlines{position:absolute; top:0; bottom:0; pointer-events:none; z-index:0}
+.gline{position:absolute; top:0; bottom:0; width:1px; background:var(--grid)}
+.gline.m{background:var(--grid-2)}
+.gwe{position:absolute; top:0; bottom:0; background:var(--weekend)}
+.todayline{position:absolute; top:0; bottom:0; width:2px; background:var(--today); opacity:.75; z-index:3}
+.todayflag{
+  position:absolute; top:0; transform:translateX(-50%); z-index:22;
+  width:0; height:0; border-left:5px solid transparent; border-right:5px solid transparent;
+  border-top:7px solid var(--today);
+}
+
+/* ---------- gantt table ---------- */
+.grid{min-width:min-content}
+/* Pas de z-index sur la ligne : lui en donner un en ferait un contexte d'empilement, et
+   la colonne gelée de gauche (.lft, z-index 10) se retrouverait sous le calque des liens
+   (.deps, z-index 5) — une flèche venant d'une barre sortie de l'écran se dessinait alors
+   par-dessus les noms de tâches. Les lignes passent quand même au-dessus de la trame de
+   fond : elles sont positionnées et viennent après elle dans le document. */
+/* Le trait de séparation est porté par les deux moitiés de la ligne, pas par la ligne
+   elle-même : sinon il reste, entre deux colonnes gelées, une bande d'un pixel que rien
+   n'occupe — et le calque des liens s'y voyait passer par-dessus la partie gauche. */
+.row{display:flex; align-items:stretch; position:relative}
+.row>.lft,.row>.tl{border-bottom:1px solid var(--line)}
+.tl-head .row>.lft,.tl-head .row>.tl{border-bottom:0}
+.row:hover .lft{background:var(--surface-2)}
+.row.editrow{z-index:80}
+.row.editrow .lft{z-index:80}
+.row:hover .tl{background:color-mix(in srgb,var(--surface-2) 60%,transparent)}
+.lft{
+  position:sticky; left:0; z-index:10; background:var(--surface);
+  display:flex; align-items:center; border-right:1px solid var(--line-2); flex:none;
+}
+.tl-head .lft{z-index:25}
+.c.editing{overflow:visible; z-index:60}
+.c{position:relative; padding:0 8px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:12.5px}
+.c.name{flex:none; width:var(--w-name); display:flex; align-items:center; gap:6px}
+.c.own{flex:none; width:var(--w-own); color:var(--ink-2)}
+.c.due{flex:none; width:var(--w-due); color:var(--ink-2); font-family:"IBM Plex Mono",monospace; font-size:11.5px}
+.c.pct{flex:none; width:var(--w-pct); text-align:right; font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink-2)}
+.c.note{flex:none; width:var(--w-note); color:var(--ink-3); font-size:11.5px}
+/* Ligne de lot : un regroupement visuel, pas un niveau de données. D'où le trait fin
+   et l'absence de propriétaire — le lot ne porte ni responsable ni échéance propre. */
+.rowlot{height:28px; background:color-mix(in srgb,var(--surface-2) 60%,transparent)}
+.rowlot .lft{background:color-mix(in srgb,var(--surface-2) 60%,var(--surface))}
+.lotname{font-size:12px; font-weight:600; color:var(--ink-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.lotdots{
+  appearance:none; border:0; background:none; cursor:pointer; color:var(--ink-3);
+  padding:0 5px; border-radius:4px; font-size:14px; line-height:1;
+}
+.lotdots:hover{background:var(--surface-3); color:var(--ink)}
+.menu-lot{min-width:280px}
+.menu-lot label{border-radius:6px}
+.bar.lotbar{height:6px; background:var(--bc); opacity:.55; border-radius:3px}
+.tl-head .c{font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-3); font-weight:600; font-family:Archivo}
+.rowh{height:44px}
+.rowp{height:38px}
+.rowp .lft{background:var(--surface-2)}
+.rowt{height:32px}
+.twist{
+  appearance:none; border:0; background:none; cursor:pointer; color:var(--ink-3);
+  width:18px; height:18px; flex:none; display:grid; place-items:center; border-radius:4px; padding:0;
+}
+.twist:hover{background:var(--surface-3); color:var(--ink)}
+.twist svg{transition:transform .15s ease}
+.twist[aria-expanded="false"] svg{transform:rotate(-90deg)}
+.pname{font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  flex:0 1 auto; min-width:4.5em}
+.tname{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer}
+.tname:hover{text-decoration:underline; text-underline-offset:2px}
+.indent{width:16px; flex:none}
+.tl{position:relative; flex:none}
+
+/* bars */
+.bar.task,.bar.proj,.bar.obj{cursor:grab}
+.bar .h{position:absolute; top:-2px; bottom:-2px; width:7px; cursor:ew-resize; z-index:4}
+.bar .h.l{left:-3px} .bar .h.r{right:-3px}
+.bar .h::after{content:""; position:absolute; inset:4px 2px; border-radius:2px; background:transparent}
+.bar:hover .h::after{background:color-mix(in srgb,var(--bc) 55%,var(--surface))}
+body.dragging,body.dragging *{cursor:grabbing!important; user-select:none}
+body.dragging-x,body.dragging-x *{cursor:ew-resize!important; user-select:none}
+.deps{position:absolute; top:0; pointer-events:none; z-index:5; overflow:visible}
+.depline{fill:none; stroke:var(--ink-3); stroke-width:1.4}
+.depline.bad{stroke:var(--danger); stroke-width:1.8}
+.dephead{fill:var(--ink-3)} .dephead.bad{fill:var(--danger)}
+/* Un couloir transparent le long du trait : c'est lui qui reçoit le clic de suppression,
+   le trait lui-même étant trop fin pour être visé. */
+.dephit{fill:none; stroke:transparent; stroke-width:8; pointer-events:none}
+.deps.cliquable .dephit{pointer-events:stroke; cursor:pointer}
+.deps.cliquable .dephit:hover+.depline{stroke:var(--danger)}
+/* Point de départ d'un lien, au bout de la barre. Discret tant qu'on ne survole pas la
+   ligne — sinon chaque barre porte une pastille et le Gantt devient bruyant. */
+.dep-out{position:absolute; right:-9px; top:50%; transform:translateY(-50%);
+  width:11px; height:11px; border-radius:50%; background:var(--surface);
+  border:2px solid var(--bc); cursor:crosshair; z-index:6; opacity:0}
+.row:hover .dep-out{opacity:1}
+.dep-out:hover{background:var(--bc)}
+.milestone .dep-out{right:-11px}
+.lienprov{position:fixed; inset:0; width:100vw; height:100vh; pointer-events:none; z-index:120}
+.lienprov path{fill:none; stroke:var(--accent); stroke-width:2; stroke-dasharray:4 3}
+body.linking,body.linking *{cursor:crosshair!important; user-select:none}
+body.linking .bar.task:hover,body.linking .milestone:hover{box-shadow:0 0 0 2px var(--accent)}
+/* Poignée d'ordre : l'ordre des tâches est manuel, il ne suit plus les dates. */
+.ogrip{flex:none; width:12px; margin-right:2px; text-align:center; cursor:grab;
+  color:var(--ink-3); font-size:10px; line-height:1; opacity:0; user-select:none}
+.row.rowt:hover .ogrip,.row.rowlot:hover .ogrip{opacity:.55}
+.row.rowlot .ogrip{margin-right:4px}
+.ogrip:active{cursor:grabbing}
+.row.odrag{opacity:.45}
+.row.oavant .lft{box-shadow:inset 0 2px 0 0 var(--accent)}
+.row.oapres .lft{box-shadow:inset 0 -2px 0 0 var(--accent)}
+.row.olot .lft{background:var(--accent-soft)}
+.addrow.addlot{width:auto; padding:0 6px; font-size:10.5px; line-height:15px; margin-left:4px}
+@media print{ .ogrip,.dep-out{display:none} }
+.bar{position:absolute; top:50%; transform:translateY(-50%); border-radius:4px; min-width:6px; z-index:2}
+.bar.task{height:15px; background:color-mix(in srgb,var(--bc) 26%,var(--surface)); border:1px solid var(--bc)}
+.bar.task .fill{position:absolute; inset:0; width:var(--pw,0%); background:var(--bc); border-radius:3px 0 0 3px}
+.bar.task.done .fill{border-radius:3px}
+.bar.proj{height:9px; background:var(--bc); border-radius:3px; opacity:.9}
+.bar.proj.thin{height:7px; opacity:.7}
+.bar.proj.thin::before,.bar.proj.thin::after{display:none}
+.bar.proj::before,.bar.proj::after{
+  content:""; position:absolute; top:100%; width:0; height:0;
+  border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid var(--bc);
+}
+.bar.proj::before{left:0} .bar.proj::after{right:0}
+.bar.obj{height:20px; background:color-mix(in srgb,var(--bc) 22%,var(--surface)); border:1.5px solid var(--bc); border-radius:5px}
+.bar.obj .fill{position:absolute; inset:0; width:var(--pw,0%); background:var(--bc); opacity:.85; border-radius:3px 0 0 3px}
+.bar.late{
+  background-image:repeating-linear-gradient(135deg,transparent 0 4px,color-mix(in srgb,var(--danger) 45%,transparent) 4px 6px);
+  box-shadow:0 0 0 1.5px var(--danger);
+}
+.milestone{
+  position:absolute; top:50%; width:12px; height:12px; margin-left:-6px; z-index:3;
+  transform:translateY(-50%) rotate(45deg); background:var(--bc); border-radius:2px;
+}
+.blabel{
+  position:absolute; top:50%; transform:translateY(-50%); font-size:11px; color:var(--ink-2);
+  white-space:nowrap; z-index:2; pointer-events:none; padding-left:6px;
+}
+.bar[title]{cursor:pointer}
+
+/* ---------- roadmap ---------- */
+.rm{padding:0 0 40px}
+.rm-intro{padding:20px 22px 14px; max-width:70ch}
+.rm-intro h2{font-family:Fraunces,Georgia,serif; font-weight:600; font-size:20px; margin:0 0 5px}
+.rm-intro p{margin:0; color:var(--ink-2); font-size:13.5px}
+.rowo{height:52px}
+.rowo .lft{background:var(--surface)}
+.oname{font-family:Fraunces,Georgia,serif; font-size:14.5px; font-weight:600; line-height:1.15; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.ometa{font-size:11px; color:var(--ink-3); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.rowpr{height:28px}
+.rowpr .lft{background:var(--surface)}
+.prname{font-size:12px; color:var(--ink-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.c.oname-c{flex:none; width:344px; display:flex; align-items:center; gap:8px}
+.orail{width:3px; align-self:stretch; margin:7px 0; border-radius:2px; flex:none; background:var(--bc)}
+.cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; padding:18px 22px 0}
+.card{
+  background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--bc);
+  border-radius:10px; padding:13px 15px 14px; box-shadow:var(--shadow-1); cursor:pointer;
+}
+.card:hover{border-color:var(--line-2); box-shadow:var(--shadow-2)}
+.card h3{font-family:Fraunces,Georgia,serif; font-size:15px; font-weight:600; margin:0 0 3px; line-height:1.2}
+.card .stmt{font-size:12.5px; color:var(--ink-2); margin:0 0 10px; line-height:1.45}
+.card .meta{display:flex; gap:8px; flex-wrap:wrap; align-items:center; font-size:11.5px; color:var(--ink-3)}
+.pbar{height:5px; background:var(--surface-3); border-radius:3px; overflow:hidden; margin:9px 0 8px}
+.pbar i{display:block; height:100%; background:var(--bc); border-radius:3px}
+.plist{list-style:none; margin:9px 0 0; padding:0; display:flex; flex-direction:column; gap:4px}
+.plist li{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-2)}
+.plist .pd{width:5px; height:5px; border-radius:50%; background:var(--ink-3); flex:none}
+.sec-title{
+  font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-3);
+  font-weight:600; padding:22px 22px 8px;
+}
+
+/* ---------- drawer ---------- */
+.scrim{position:fixed; inset:0; background:rgba(15,22,12,.34); z-index:60}
+.drawer{
+  position:fixed; top:0; right:0; bottom:0; width:min(420px,100%); z-index:61;
+  background:var(--surface); border-left:1px solid var(--line-2); box-shadow:var(--shadow-2);
+  display:flex; flex-direction:column;
+}
+.drawer header{padding:16px 20px 12px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px}
+.drawer header h2{font-family:Fraunces,Georgia,serif; font-size:16px; font-weight:600; margin:0; flex:1}
+.drawer .body{padding:16px 20px; overflow:auto; flex:1; display:flex; flex-direction:column; gap:13px}
+.drawer footer{padding:12px 20px; border-top:1px solid var(--line); display:flex; gap:8px; align-items:center}
+.lb{display:flex; flex-direction:column; gap:4px}
+.lb > span{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-3); font-weight:600}
+.lb input,.lb select,.lb textarea{width:100%}
+.two{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.swatches{display:flex; gap:6px; flex-wrap:wrap}
+.sw{width:24px; height:24px; border-radius:6px; border:2px solid transparent; cursor:pointer; padding:0}
+.sw[aria-pressed="true"]{border-color:var(--ink); box-shadow:0 0 0 2px var(--surface) inset}
+.hint{font-size:11.5px; color:var(--ink-3); line-height:1.45}
+.banner{
+  margin:10px 22px 0; padding:8px 12px; border-radius:var(--r); font-size:12.5px;
+  background:var(--danger-soft); border:1px solid var(--danger-line); color:var(--ink);
+}
+
+@media (max-width:760px){
+  :root{--w-name:190px; --w-own:0px; --w-due:74px; --w-pct:0px; --w-note:0px}
+  .c.own,.c.pct,.c.note{display:none}
+  .c.oname-c{width:184px}
+  .appbar{padding:10px 12px 0; gap:12px}
+  .brand h1{font-size:17px}
+  .brand .sub{display:none}
+  .toolbar,.filterbar{padding:8px 12px; gap:7px}
+  .legend{display:none}
+  .rm-intro{padding:14px 12px 10px}
+  .cards{padding:14px 12px 0; grid-template-columns:1fr}
+  .sec-title{padding:16px 12px 6px}
+  .drawer{width:100%}
+  .tab{padding:8px 9px 10px; font-size:13px}
+  .rowp .chip-obj{display:none}
+  .savebox{font-size:11px; margin-bottom:8px}
+  .filterbar .togs{gap:4px}
+  .banner{margin:8px 12px 0}
+}
+@media print{
+  .appbar,.toolbar,.drawer,.scrim{display:none}
+  .scroller{overflow:visible}
+  body{background:#fff}
+}
+
+
+/* ============ onglets rencontres ============ */
+.rencpane{display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:16px; padding:16px 22px 40px; align-items:start}
+.renccol{display:flex; flex-direction:column; gap:14px; min-width:0}
+.rprev{display:flex; flex-direction:column; gap:10px; min-width:0}
+.rprev h4{margin:6px 0 2px; font-size:11.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-3); font-weight:600}
+
+.rmeet{background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:14px 16px 16px; box-shadow:var(--shadow-1)}
+.rmeet header{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; border-bottom:1px solid var(--line); padding-bottom:8px; margin-bottom:10px}
+.rmeet h3{font-family:Fraunces,Georgia,serif; font-size:16px; font-weight:600; margin:0; letter-spacing:-.01em}
+.rmeet .dur{font-size:11.5px; color:var(--ink-3); font-family:"IBM Plex Mono",monospace}
+.rmeet .qui{margin:-4px 0 12px; font-size:12px; color:var(--ink-3)}
+.rmeet .sortie{margin:12px 0 0; padding-top:9px; border-top:1px dashed var(--line); font-size:12px; color:var(--ink-2)}
+.rmeet .sortie b{color:var(--ink)}
+
+.rseg{margin-bottom:12px}
+.rseg:last-of-type{margin-bottom:0}
+.rhead{display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin-bottom:5px}
+.rmin{font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--ink-2); background:var(--surface-3);
+  border-radius:4px; padding:1px 6px; font-weight:500}
+.rhead b{font-size:13.5px; font-weight:600}
+.rhead i{font-style:normal; font-size:11.5px; color:var(--ink-3)}
+.rseg textarea{width:100%; resize:vertical; background:var(--surface-2); border:1px solid var(--line);
+  border-radius:6px; padding:8px 10px; font-size:13.5px; line-height:1.5; min-height:62px}
+.rseg textarea:focus{background:var(--surface); border-color:var(--accent-line)}
+
+.rmeet.ro{padding:11px 13px 13px; background:var(--surface-2); box-shadow:none}
+.rmeet.ro h3{font-size:14px}
+.rmeet.ro .rseg{margin-bottom:9px}
+.rseg.ro b{display:block; font-size:11.5px; color:var(--ink-3); text-transform:uppercase; letter-spacing:.05em; margin-bottom:2px}
+.rseg.ro p{margin:0; font-size:13px; white-space:pre-wrap; color:var(--ink-2)}
+.rmeet.vide .rien{margin:0; font-size:12.5px; color:var(--ink-3)}
+
+.mesgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-bottom:9px}
+.mesitem{display:flex; flex-direction:column; gap:3px}
+.mesitem>span{font-size:12px; color:var(--ink-2); line-height:1.3}
+.mesitem>span i{font-style:normal; color:var(--ink-3)}
+.mesitem input{background:var(--surface-2); border:1px solid var(--line); border-radius:6px;
+  padding:6px 8px; font-family:"IBM Plex Mono",monospace; font-size:14px; width:100%}
+.mesitem input:focus{background:var(--surface); border-color:var(--accent-line)}
+.mesitem em{font-style:normal; font-size:11px; color:var(--ink-3); font-family:"IBM Plex Mono",monospace}
+
+.calcs{margin:0 0 12px}
+.calcs.ro{margin-bottom:8px}
+.tuiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(132px,1fr)); gap:8px}
+.tuile{background:var(--surface-3); border-radius:7px; padding:8px 10px 9px; min-width:0}
+.tuile b{display:block; font-size:10.5px; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--ink-3); font-weight:600; margin-bottom:2px}
+.tuile .v{display:block; font-family:"IBM Plex Mono",monospace; font-size:19px; font-weight:500;
+  line-height:1.15; letter-spacing:-.01em}
+.tuile .d{display:block; font-size:10.5px; color:var(--ink-3); margin-top:2px; line-height:1.3}
+.tuile.bad .v{color:var(--danger)}
+.tuile.bad{box-shadow:inset 2.5px 0 0 var(--danger)}
+.pied{margin:8px 0 0; font-size:12.5px; color:var(--ink-2)}
+.pied.bad{color:var(--danger)}
+.calcs.ro .tuile{padding:6px 8px}
+.calcs.ro .tuile .v{font-size:15px}
+.calcs.ro .pied{font-size:12px}
+
+.souslab{margin:0 0 6px; font-size:11.5px; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--ink-3); font-weight:600}
+
+.sqgrid{display:flex; flex-direction:column; gap:5px; margin-bottom:10px}
+.sqrow{display:grid; grid-template-columns:24px 108px 1fr; gap:8px; align-items:start}
+.sqlet{font-family:"IBM Plex Mono",monospace; font-size:12px; font-weight:600; text-align:center;
+  background:var(--accent-soft); color:var(--accent); border-radius:4px; padding:4px 0}
+.sqlab{font-size:12px; color:var(--ink-3); padding-top:4px; line-height:1.25}
+.sqrow textarea{width:100%; resize:vertical; background:var(--surface-2); border:1px solid var(--line);
+  border-radius:6px; padding:5px 8px; font-size:13px; line-height:1.4; min-height:40px}
+.sqrow textarea:focus{background:var(--surface); border-color:var(--accent-line)}
+.sqro{margin:0 0 7px}
+.sqro p{margin:0 0 3px; font-size:12.5px; color:var(--ink-2)}
+.sqro b{display:inline-block; width:15px; color:var(--accent); font-family:"IBM Plex Mono",monospace}
+
+.semlab{font-weight:600; color:var(--ink-2)}
+
+/* ---- production spéciale ---- */
+.spec{margin:0 0 11px; padding:9px 11px; background:var(--surface-3); border-radius:6px}
+.specligne{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.specligne+.specligne{margin-top:7px}
+.speclab{font-size:12.5px; color:var(--ink-2); font-weight:600}
+.segbtns{display:flex; gap:2px; background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:2px}
+.sb{border:none; background:none; padding:3px 11px; font-size:12.5px; color:var(--ink-3);
+  border-radius:4px; cursor:pointer; line-height:1.5}
+.sb:hover{color:var(--ink-2); background:var(--surface-2)}
+.sb.on{background:var(--accent); color:var(--accent-ink); font-weight:600}
+.sb.on.warn{background:var(--prio-important); color:#fff}
+.sb.on.bad{background:var(--danger); color:#fff}
+.specq{width:100%; margin-top:7px; background:var(--surface); border:1px solid var(--line);
+  border-radius:6px; padding:6px 9px; font-size:13px}
+.specq:focus{border-color:var(--accent-line)}
+.specnote{margin:7px 0 0; font-size:11.5px; color:var(--ink-3); line-height:1.4}
+.specro{margin:0 0 6px; font-size:12.5px; color:var(--ink-2)}
+.specro b{color:var(--ink)}
+.pill{display:inline-block; font-size:11px; padding:1px 7px; border-radius:9px;
+  background:var(--accent-soft); color:var(--accent); font-weight:600}
+.pill.warn{background:var(--prio-imp-soft); color:var(--prio-important)}
+.pill.bad{background:var(--danger-soft); color:var(--danger)}
+
+/* ---- suivis ---- */
+.rmeet.suivis header{margin-bottom:9px}
+.rmeet.suivis .spacer{flex:1}
+.btn.mini{padding:2px 8px; font-size:12px}
+.btn.mini.plus{margin-top:7px}
+.svrow{display:grid; grid-template-columns:22px 1fr auto 22px; gap:7px; align-items:center; margin-bottom:5px}
+.svrow:last-child{margin-bottom:0}
+.svchk{width:20px; height:20px; border:1px solid var(--line-2); border-radius:4px; background:var(--surface-2);
+  cursor:pointer; padding:0; font-size:12px; line-height:1; color:var(--accent)}
+.svchk:hover{border-color:var(--accent-line); background:var(--accent-soft)}
+.svrow input{width:100%; background:var(--surface-2); border:1px solid var(--line); border-radius:6px;
+  padding:5px 8px; font-size:13px}
+.svrow input:focus{background:var(--surface); border-color:var(--accent-line)}
+.svsem{font-size:11px; color:var(--ink-3); font-family:"IBM Plex Mono",monospace; white-space:nowrap}
+.svdel{width:20px; height:20px; border:none; background:none; color:var(--ink-3); cursor:pointer;
+  font-size:16px; line-height:1; padding:0; border-radius:4px}
+.svdel:hover{color:var(--danger); background:var(--danger-soft)}
+.svrow.clos input{color:var(--ink-3); text-decoration:line-through; background:transparent}
+.svrow.clos .svchk{background:var(--accent-soft); border-color:var(--accent-line)}
+.svclos{margin-top:7px; padding-top:7px; border-top:1px dashed var(--line)}
+.rmeet.suivis .rien{margin:0; font-size:12.5px; color:var(--ink-3)}
+
+/* ---- épingler une ligne de la semaine passée ---- */
+.rline{display:flex; gap:5px; align-items:flex-start; margin:0 0 2px}
+.rline>span{flex:1; font-size:13px; color:var(--ink-2)}
+.rline .pin{flex:none; width:18px; height:18px; padding:0; border:none; background:none; cursor:pointer;
+  color:var(--ink-3); font-size:12px; line-height:1; border-radius:4px; opacity:.35; margin-top:2px}
+.rprev:hover .pin{opacity:.7}
+.rline .pin:hover{opacity:1; color:var(--accent); background:var(--accent-soft)}
+.sqro .rline>span b{display:inline-block; width:15px; color:var(--accent); font-family:"IBM Plex Mono",monospace}
+
+@media (max-width:900px){
+  .rencpane{grid-template-columns:1fr; padding:12px 12px 32px}
+  .sqrow{grid-template-columns:24px 1fr}
+  .sqlab{display:none}
+}
+@media print{
+  .rencpane{display:block; padding:0}
+  .rprev .rmeet.ro,.rprev h4{display:none}
+  .rmeet{break-inside:avoid; box-shadow:none; border-color:#ccc; margin-bottom:10px}
+  .rseg textarea{border:none; background:none; padding:0; resize:none; min-height:0}
+  .rseg textarea,.sqrow textarea,.svrow input{border:1px solid #ddd}
+  .pin,.svdel,.btn.mini{display:none}
+}
+
+/* ---- bouton « + » d'ajout rapide sur les lignes projet et lot ---- */
+.addrow{flex:none; margin-left:auto; width:17px; height:17px; padding:0; margin-left:5px; border:1px solid var(--line-2);
+  border-radius:4px; background:var(--surface); color:var(--ink-3); cursor:pointer;
+  font-size:13px; line-height:14px; opacity:.35; transition:opacity .12s, color .12s, border-color .12s}
+.row:hover .addrow{opacity:1}
+.addrow:hover{color:var(--accent-ink); background:var(--accent); border-color:var(--accent)}
+.addrow:focus-visible{opacity:1}
+@media print{ .addrow{display:none} }
+
+/* Sur la ligne de projet, les pastilles cèdent avant le bouton « + » : c'est le nom
+   et le bouton qui doivent rester visibles quand la colonne est étroite.
+   (Portée limitée à .rowp : la ligne de lot contient le menu contextuel, qu'il ne
+   faut surtout pas rogner.) */
+.rowp .c.name{overflow:hidden}
+.rowp .c.name .chip{flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+
+/* ---- lot Backlog : présent d'office dans chaque projet, toujours en dernier ---- */
+.row.rowbacklog .lotname{color:var(--ink-3); font-weight:500}
+.row.rowvide .vide{font-size:12px; color:var(--ink-3); font-style:italic}
+.row.rowvide{opacity:.85}
+
+/* ---- « tout cocher / tout décocher » en tête d'un menu de filtre ---- */
+.menu-all{display:block; width:100%; text-align:left; padding:5px 8px; margin-bottom:4px;
+  border:none; border-bottom:1px solid var(--line); background:none; cursor:pointer;
+  font-size:12px; color:var(--ink-3); font-weight:600; border-radius:4px 4px 0 0}
+.menu-all:hover{background:var(--surface-3); color:var(--accent)}
+
+.btn[disabled]{opacity:.45; cursor:default}
+.btn[disabled]:hover{background:none; border-color:var(--line)}
+
+/* ---- tour de table ---- */
+.tour{display:flex; flex-direction:column; gap:12px}
+.tgroupe{border-left:2px solid var(--line); padding-left:10px}
+.tligne{display:grid; grid-template-columns:13px 19px 22px 1fr 20px 20px; gap:6px; align-items:center; margin-bottom:4px}
+.tligne.tentete{grid-template-columns:1fr 20px; margin-bottom:6px}
+.tligne input{width:100%; background:var(--surface-2); border:1px solid var(--line);
+  border-radius:5px; padding:5px 8px; font-size:13px}
+.tligne input:focus{background:var(--surface); border-color:var(--accent-line)}
+.tligne input.tnom{font-weight:600; background:none; border-color:transparent; padding-left:0;
+  font-family:Fraunces,Georgia,serif; font-size:14px}
+.tligne input.tnom:focus{background:var(--surface); border-color:var(--accent-line); padding-left:8px}
+.stbtn{width:22px; height:22px; padding:0; border-radius:5px; cursor:pointer; font-size:11px;
+  line-height:20px; border:1px solid var(--line-2); background:var(--surface-2); color:var(--ink-3)}
+.stbtn.st-s{border-color:var(--prio-important); color:var(--prio-important); background:var(--prio-imp-soft); font-weight:700}
+.stbtn.st-f{border-color:var(--accent-line); color:var(--accent); background:var(--accent-soft); font-weight:700}
+.stbtn.st-b{border-style:dashed; color:var(--ink-3)}
+/* Drapeau « à discuter aujourd'hui ». Éteint il s'efface presque : ce qui doit sauter aux
+   yeux, c'est la poignée de points allumés, pas la colonne de cases. */
+.flbtn{width:19px; height:20px; padding:0; border:none; background:none; cursor:pointer;
+  font-size:12px; line-height:1; border-radius:4px; color:var(--ink-3); opacity:.22}
+.tligne:hover .flbtn{opacity:.5}
+.flbtn:hover{opacity:.9; background:var(--prio-imp-soft)}
+.flbtn.on,.tligne:hover .flbtn.on{opacity:1; color:var(--prio-important)}
+/* Le backlog n'est pas une etape du cycle info → a suivre → ferme : son bouton est a part,
+   discret, et ne devient visible qu'au survol de la ligne. */
+.bkbtn{width:20px; height:20px; padding:0; border:none; background:none; cursor:pointer;
+  color:var(--ink-3); font-size:12px; line-height:1; border-radius:4px; opacity:.3}
+.tligne:hover .bkbtn{opacity:.85}
+.bkbtn:hover{color:var(--accent); background:var(--accent-soft); opacity:1}
+.bkbtn.on{opacity:.9; color:var(--accent)}
+/* Poignee de glissement */
+.tgrip{display:block; width:13px; text-align:center; cursor:grab; color:var(--ink-3);
+  font-size:11px; line-height:22px; opacity:0; user-select:none}
+.tligne:hover .tgrip{opacity:.55}
+.tgrip:active{cursor:grabbing}
+.tligne.tdrag{opacity:.4}
+.tligne.tover{box-shadow:0 -2px 0 0 var(--accent) inset}
+.tgroupe.tovergrp{background:var(--accent-soft); border-left-color:var(--accent-line); border-radius:0 6px 6px 0}
+/* Backlog, colonne de droite */
+.svrow.bkrow{grid-template-columns:22px 1fr auto 22px; align-items:start}
+.svrow.bkrow .svchk{color:var(--ink-2); line-height:18px}
+.svrow.bkrow .svsem{margin-top:2px}
+.rmeet.suivis .qui{margin:0 0 9px}
+.tdel{width:20px; height:20px; border:none; background:none; color:var(--ink-3); cursor:pointer;
+  font-size:15px; line-height:1; padding:0; border-radius:4px; opacity:.35}
+.tligne:hover .tdel{opacity:1}
+.tdel:hover{color:var(--danger); background:var(--danger-soft)}
+.tourro .tpers{margin:7px 0 2px; font-size:11.5px; font-weight:700; color:var(--ink-2)}
+.tourro .tpers:first-child{margin-top:0}
+.svtxt{font-size:13px; color:var(--ink-2); line-height:1.35}
+.svtxt b{color:var(--ink)}
+@media print{ .tdel,.bkbtn,.tgrip,.tour .btn{display:none}
+  .tligne{grid-template-columns:19px 22px 1fr}
+  .flbtn{opacity:1; color:#000}
+  .flbtn:not(.on){visibility:hidden}
+  .tligne input{border:none; background:none; padding-left:0} }
+
+/* ---- rappel de la semaine précédente, dans le segment de retour ---- */
+.rappel{background:var(--surface-2); border:1px solid var(--line); border-radius:7px;
+  padding:9px 11px 10px; margin-bottom:9px}
+.rappel .souslab{margin-bottom:7px}
+.rappel .rseg.ro{margin-bottom:8px}
+.rappel .rseg.ro:last-child{margin-bottom:0}
+.rappel .rien{margin:0; font-size:12.5px; color:var(--ink-3)}
+.rappel:hover .pin{opacity:.7}
+
+/* Valeurs rappelées d'une autre semaine : modifiables, mais visuellement en retrait
+   pour qu'on ne les confonde pas avec la saisie du jour. */
+.mesitem.rappelm > span{color:var(--ink-3)}
+.mesitem.rappelm input{background:transparent; border-style:dashed}
+.mesitem.rappelm input:focus{background:var(--surface); border-style:solid; border-color:var(--accent-line)}
+.mesitem.rappelm em{color:var(--ink-3); font-style:italic; font-family:Archivo,sans-serif}
+
+/* Grille du retour : quatre colonnes fixes, pour que les valeurs rappelées tombent
+   exactement sous les heures déclarées correspondantes. La deuxième ligne démarre en
+   colonne 2 — « Heures STD planifiées » sous « Heures MOD déclarées ». */
+.mesgrid.mes5{grid-template-columns:repeat(5,minmax(0,1fr))}
+/* Heures payées : une valeur calculée, pas un champ. Même gabarit que les autres cellules
+   pour que la ligne reste droite, mais sans cadre de saisie — on ne clique pas dedans. */
+.mesitem.calc>b{font-family:"IBM Plex Mono",monospace; font-size:17px; font-weight:600;
+  color:var(--ink-2); padding:6px 0 6px 1px; line-height:1.2}
+@media (max-width:760px){
+  .mesgrid.mes5{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+}
