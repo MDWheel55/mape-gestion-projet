@@ -1042,9 +1042,9 @@ function viewBar(){
   var h='<div class="appbar">'+
     '<div class="brand"><img class="logo" src="mape-logo.png" alt="Mapé"><span class="sub">Gestion de projet</span></div>'+
     '<div class="tabs" role="tablist">'+
+      '<button class="tab" role="tab" aria-selected="'+(ui.tab==='carte')+'" data-act="tab" data-t="carte">Infrastructure</button>'+
       '<button class="tab" role="tab" aria-selected="'+(ui.tab==='roadmap')+'" data-act="tab" data-t="roadmap">Feuille de route <span class="n">'+nO+'</span></button>'+
       '<button class="tab" role="tab" aria-selected="'+(ui.tab==='gantt')+'" data-act="tab" data-t="gantt">Projets et tâches <span class="n">'+nP+'/'+nT+'</span></button>'+
-      '<button class="tab" role="tab" aria-selected="'+(ui.tab==='carte')+'" data-act="tab" data-t="carte">Infrastructure</button>'+
     '</div>'+
     '<div class="savebox"><span class="dot '+sv.c+'"></span>'+esc(sv.t)+'</div>'+
   '</div>';
@@ -1060,6 +1060,7 @@ function viewBar(){
     h+='<span class="spacer"></span>';
     if(!ui.readOnly){
       h+='<button class="btn ghost" data-act="reload" title="Relire les listes SharePoint">Recharger</button>';
+      h+='<button class="btn" data-act="carte-lier" title="Lier les boîtes aux projets d’après leurs noms">Lier aux projets</button>';
       h+='<button class="btn" data-act="carte-new" data-g="zone">+ Zone</button>';
       h+='<button class="btn primary" data-act="carte-new" data-g="bloc">+ Boîte</button>';
     }
@@ -1448,7 +1449,8 @@ function majFleches(){
 }
 function htmlElement(e){
   var p=e.projectId? byId(state.projects,e.projectId) : null;
-  var titre=p? (p.name||'Projet') : (e.name||'');
+  var titre=e.name || (p? (p.name||'Projet') : '');
+  var num=p? (/^\s*(\d+)/.exec(p.name||'')||[])[1] : '';
   var et=p? etatProjet(p) : '';
   var pr=p? projProgress(p) : null;
   var st='left:'+e.x+'px;top:'+e.y+'px;width:'+e.w+'px;height:'+e.h+'px';
@@ -1462,7 +1464,7 @@ function htmlElement(e){
   return '<div class="cbox st-'+esc(e.style)+(p?' lie et-'+et:'')+'" data-cid="'+esc(e.id)+'" data-act="edit-carte" data-id="'+esc(e.id)+'" style="'+st+'">'+
     '<b>'+esc(titre)+'</b>'+
     (e.note?'<span class="cnote">'+esc(e.note)+'</span>':'')+
-    (p?'<span class="cetat">'+CETATS[et]+(pr!==null&&et==='encours'?' · '+pr+'%':'')+'</span>':'')+
+    (p?'<span class="cetat" title="'+esc(p.name||'')+'">'+(num?num+' · ':'')+CETATS[et]+(pr!==null&&et==='encours'?' · '+pr+'%':'')+'</span>':'')+
     outils+'</div>';
 }
 function viewCarte(){
@@ -1530,7 +1532,7 @@ function carteSeed(){
     if(e.genre==='bloc'){
       var n=e.name.toLowerCase();
       var m=parNom.filter(function(x){ return n.indexOf(x.n)===0 || x.n.indexOf(n)===0; })[0];
-      if(m){ e.projectId=m.p.id; e.name=''; }
+      if(m){ e.projectId=m.p.id; }
     }
     return e;
   });
@@ -1538,6 +1540,52 @@ function carteSeed(){
   render();
   requestAnimationFrame(ajusterCarte);
   enregistrerLot(state.carte.map(function(e){ return ['carte',e]; }));
+}
+/* Lier les boîtes aux projets d'après les mots qu'ils partagent (« 05 · Promesses électorales »
+   ↔ « Promesses électorales PQ »). Chaque projet va à une seule boîte, la meilleure d'abord ;
+   une correspondance trop faible est laissée de côté plutôt que devinée. */
+function motsDe(s){
+  var vides={de:1,des:1,du:1,la:1,le:1,les:1,et:1,en:1,au:1,aux:1,par:1,pour:1,sur:1,avec:1,une:1,un:1,
+             puis:1,partir:1,dun:1,dune:1,leur:1,qui:1,que:1,vers:1};
+  return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/^\s*\d+\s*[·.\-–]\s*/,'').replace(/[^a-z0-9]+/g,' ').split(' ')
+    .filter(function(w){ return w.length>=3 && !vides[w] && !/^\d+$/.test(w); })
+    .map(function(w){ return w.length>4? w.replace(/(s|x)$/,'') : w; });
+}
+function lierAuxProjets(){
+  if(ui.readOnly) return;
+  var dejaPris={}, boites=state.carte.filter(function(e){ return e.genre==='bloc'; });
+  boites.forEach(function(e){ if(e.projectId) dejaPris[e.projectId]=1; });
+  var libres=boites.filter(function(e){ return !e.projectId && e.style!=='externe' && e.style!=='donnees'; });
+  var couples=[];
+  state.projects.forEach(function(p){
+    if(dejaPris[p.id]) return;
+    var mp=motsDe(p.name); if(!mp.length) return;
+    libres.forEach(function(e){
+      var mt=motsDe(e.name), mn=motsDe(e.note);
+      var comT=mp.filter(function(w){ return mt.indexOf(w)>=0; }).length;
+      var comN=mp.filter(function(w){ return mt.indexOf(w)<0 && mn.indexOf(w)>=0; }).length;
+      // Un mot du titre de la boîte vaut plus qu'un mot de son sous-titre.
+      var s=(comT+0.75*comN)/(Math.min(mp.length,mt.length)||1);
+      if((comT || comN>=2) && s>=0.6) couples.push({p:p,e:e,s:s});
+    });
+  });
+  couples.sort(function(a,b){ return b.s-a.s; });
+  var pp={}, pe={}, faits=[];
+  couples.forEach(function(c){
+    if(pp[c.p.id]||pe[c.e.id]) return;
+    pp[c.p.id]=1; pe[c.e.id]=1; c.e.projectId=c.p.id; faits.push(c);
+  });
+  // Une boîte liée à l'import a pu perdre son nom (première version) : on le lui rend.
+  boites.forEach(function(e){
+    if(!e.name){ var s=CARTE_SEED.filter(function(x){ return x.id===e.id; })[0]; if(s){ e.name=s.name; faits.push({e:e}); } }
+  });
+  var reste=state.projects.filter(function(p){ return !dejaPris[p.id] && !pp[p.id]; }).length;
+  var n=faits.filter(function(c){ return c.p; }).length;
+  ui.msg=n+' boîte'+(n>1?'s':'')+' liée'+(n>1?'s':'')+' à un projet.'+
+    (reste?' '+reste+' projet'+(reste>1?'s':'')+' sans boîte évidente : utilise « Placer » à droite ou ouvre une boîte pour la lier.':'');
+  render();
+  if(faits.length) enregistrerLot(faits.map(function(c){ return ['carte',c.e]; }));
 }
 function supprimerFleche(id){
   var f=carteParId(id); if(!f || ui.readOnly) return;
@@ -1718,6 +1766,7 @@ document.addEventListener('click',function(ev){
   if(a==='dep-del'){ retirerLien(el.getAttribute('data-from'), el.getAttribute('data-to')); return; }
   if(a==='edit-carte'){ var ce=carteParId(el.getAttribute('data-id')); if(ce) openDrawer('carte',ce); return; }
   if(a==='carte-seed'){ carteSeed(); return; }
+  if(a==='carte-lier'){ lierAuxProjets(); return; }
   if(a==='carte-new'){ nouvelElementCarte(el.getAttribute('data-g')||'bloc'); return; }
   if(a==='carte-place'){ var pp2=byId(state.projects,el.getAttribute('data-id')); if(pp2) nouvelElementCarte('bloc',pp2); return; }
   if(a==='carte-fdel'){ supprimerFleche(el.getAttribute('data-id')); return; }
