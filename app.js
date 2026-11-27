@@ -1021,7 +1021,7 @@ function viewBar(){
         : ui.save==='saved'? {c:'ok', t:'Enregistré'}
         : {c:'', t:'Modifications enregistrées dans la page'};
   var h='<div class="appbar">'+
-    '<div class="brand"><h1>Mapé</h1><span class="sub">Gestion de projet · orientations · tâches</span></div>'+
+    '<div class="brand"><img class="logo" src="mape-logo.png" alt="Mapé"><span class="sub">Gestion de projet</span></div>'+
     '<div class="tabs" role="tablist">'+
       '<button class="tab" role="tab" aria-selected="'+(ui.tab==='roadmap')+'" data-act="tab" data-t="roadmap">Feuille de route <span class="n">'+nO+'</span></button>'+
       '<button class="tab" role="tab" aria-selected="'+(ui.tab==='gantt')+'" data-act="tab" data-t="gantt">Projets et tâches <span class="n">'+nP+'/'+nT+'</span></button>'+
