@@ -699,3 +699,40 @@ body.linking .bar.task:hover,body.linking .milestone:hover{box-shadow:0 0 0 2px 
 @media (max-width:760px){
   .mesgrid.mes5{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
 }
+
+
+/* ============ identité Mapé : marine et or (site mape.ca) ============ */
+:root{
+  --mape-marine:#0A3045; --mape-marine-2:#062B41; --mape-or:#ECD498; --mape-pale:#B9C7D2;
+  --accent:#0A3045; --accent-ink:#FFFFFF; --accent-soft:#E3EAF0; --accent-line:#B7C6D3;
+  --s1:#0A3045; --s2:#B08A2E;
+  --ground:#F2F4F6; --surface-2:#F7F9FA; --surface-3:#EBEFF2;
+  --line:#DEE3E8; --line-2:#C4CDD5; --ink:#111A22; --ink-2:#45525E; --ink-3:#74808B;
+  --grid:#E6EAEE; --grid-2:#D3DAE0; --weekend:#EFF2F4;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --accent:#ECD498; --accent-ink:#0A3045; --accent-soft:#2A2E22; --accent-line:#5A5236;
+    --s1:#5E8FB3; --s2:#D8B95E;
+    --ground:#0D141A; --surface:#141C23; --surface-2:#1A232B; --surface-3:#212B34;
+    --line:#26313B; --line-2:#36434F; --ink:#E6EBEF; --ink-2:#A9B5BF; --ink-3:#7E8A95;
+    --grid:#1C252D; --grid-2:#29343E; --weekend:#18212A;
+  }
+}
+:root[data-theme="dark"]{
+  --accent:#ECD498; --accent-ink:#0A3045; --accent-soft:#2A2E22; --accent-line:#5A5236;
+  --s1:#5E8FB3; --s2:#D8B95E;
+  --ground:#0D141A; --surface:#141C23; --surface-2:#1A232B; --surface-3:#212B34;
+  --line:#26313B; --line-2:#36434F; --ink:#E6EBEF; --ink-2:#A9B5BF; --ink-3:#7E8A95;
+  --grid:#1C252D; --grid-2:#29343E; --weekend:#18212A;
+}
+.appbar{background:var(--mape-marine); border-bottom-color:var(--mape-marine-2)}
+.brand{margin-bottom:9px}
+.brand .logo{height:30px; width:auto; display:block; margin-bottom:4px}
+.brand .sub{color:var(--mape-pale)}
+.appbar .tab{color:var(--mape-pale)}
+.appbar .tab:hover{color:#FFFFFF}
+.appbar .tab[aria-selected="true"]{color:#FFFFFF; border-bottom-color:var(--mape-or)}
+.appbar .tab .n{background:rgba(255,255,255,.12); color:#DDE5EB}
+.appbar .savebox{color:var(--mape-pale)}
+@media (max-width:760px){ .brand .logo{height:24px} }
